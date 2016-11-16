@@ -6,6 +6,7 @@ readonly WARN=1
 readonly CRIT=2
 readonly UNKNOWN=3
 
+# TODO: Option for max to be Xmx instead of ballooned size
 # TODO: Thresholds
 # TODO: Proper argument handling
 name=$1
@@ -57,3 +58,5 @@ echo "Major GC / Time: $FGC / $FGCT"
 echo "---"
 echo "Eden / Survivor / Old: $EU ($EC) / $survivor ($survivorcapacity) / $OU ($OC)"
 echo "Total heap: $usage Mb /$capacity Mb"
+
+echo "JVM Usage OK|totalHeap=$usage""MB;warn;crit;min;$capacity edenUsage=$EU""MB;warn;crit;min;$EC survivorUsage=$survivor""MB;warn;crit;min;$survivorcapacity oldUsage=$OU""MB;warn;crit;min;$OC minorGCAmount=$YGC""c minorGCTime=$YGCT""s majorGCAmount=$FGC""c majorGCTime=$FGCT""s"
