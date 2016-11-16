@@ -6,10 +6,10 @@ readonly WARN=1
 readonly CRIT=2
 readonly UNKNOWN=3
 
+# TODO: Thresholds
+# TODO: Proper argument handling
 name=$1
 user=$2
-
-jps=`jps -v | grep $name`
 
 if [ -z $user ]
 then
@@ -24,8 +24,6 @@ then
     echo "Cannot find process $name"
     exit $CRIT
 fi
-
-
 
 pid=`echo $jps | awk '{ print $1}'`
 Xmx=`echo "$jps" | egrep -o 'Xmx[0-9]*[[:alpha:]]*' | uniq | egrep -o '[0-9]*'`
