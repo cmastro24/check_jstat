@@ -36,10 +36,10 @@ This metric is a simple count of the amount of times a major GC has been trigger
 This metric is the amount of time that major GC events have taken within this JVM.
 
 ## Requirements
-java (provides jps and jstat)
-Bash
-sudo (if user running the check != to user running the jvm)
- - !requiretty
-awk
-egrep
-uniq
+* java (provides jps and jstat)
+* Bash
+* sudo (if user running the check != to user running the jvm)
+* - !requiretty
+* awk
+* egrep
+* uniq
