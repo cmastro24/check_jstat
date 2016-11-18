@@ -6,6 +6,7 @@ readonly WARN=1
 readonly CRIT=2
 readonly UNKNOWN=3
 
+# TODO: Comment the code
 # TODO: Support verbosity levels
 # TODO: Support permgen and metaspace
 # TODO: Change units to correctly identify max size (convert to MB if not)
