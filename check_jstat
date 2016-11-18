@@ -6,6 +6,7 @@ readonly WARN=1
 readonly CRIT=2
 readonly UNKNOWN=3
 
+# TODO: Use heapballoon size as capicity if Xmx is not specified
 # TODO: Comment the code
 # TODO: Support verbosity levels
 # TODO: Support permgen and metaspace
