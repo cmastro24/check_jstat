@@ -8,8 +8,6 @@ The code will output a small message informing the user what the current state o
 It will return a nagios return code so that the state of the check will change if the user defined thresholds are breached.
 It will return the following performance metrics:
 
-echo "JVM Usage OK|
-
 ### totalHeap
 This metric is the current total heap **usage** and the maximum size of the heap (set by Xmx).
 
