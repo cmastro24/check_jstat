@@ -9,7 +9,6 @@ readonly UNKNOWN=3
 # TODO: Use heapballoon size as capicity if Xmx is not specified
 # TODO: Comment the code
 # TODO: Support verbosity levels
-# TODO: Support permgen and metaspace
 # TODO: Change units to correctly identify max size (convert to MB if not)
 # TODO: Thresholds
 # TODO: Support matching pased on PID file instead of jps name
@@ -90,10 +89,22 @@ edencapacity=`echo ${EC} | awk '{ print $1 / 1024}'`
 tenured=`echo ${OU} | awk '{ print $1 / 1024}'`
 tenuredcapacity=`echo ${OC} | awk '{ print $1 / 1024}'`
 
+# Capture permgen and metaspace
+metacapacity=`echo ${MC} | awk '{ print $1 / 1024}'`
+meta=`echo ${MU} | awk '{ print $1 / 1024}'`
+permcapacity=`echo ${PC} | awk '{ print $1 / 1024}'`
+perm=`echo ${PU} | awk '{ print $1 / 1024}'`
+
 #echo "Minor GC / Time: $YGC / $YGCT"
 #echo "Major GC / Time: $FGC / $FGCT"
 #echo "---"
 #echo "Eden / Survivor / Old: $EU ($EC) / $survivor ($survivorcapacity) / $OU ($OC)"
 #echo "Total heap: $usage Mb /$capacity Mb"
 
-echo "JVM Usage OK|totalHeap=${usage}MB;;;;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+# If the PC variable (Permgen capacity) if zero / unset then we will output metaspace, if not we will output permgen
+if [ -z ${PC} ]
+then
+    echo "JVM Usage OK|totalHeap=${usage}MB;;;;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} metaSpace=${meta}MB;;;;${metacapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+else
+    echo "JVM Usage OK|totalHeap=${usage}MB;;;;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} permGen=${perm}MB;;;;${permcapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+fi
