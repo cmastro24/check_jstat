@@ -10,7 +10,6 @@ readonly UNKNOWN=3
 # TODO: Comment the code
 # TODO: Support verbosity levels
 # TODO: Change units to correctly identify max size (convert to MB if not)
-# TODO: Thresholds
 # TODO: Support matching pased on PID file instead of jps name
 
 usage() {
@@ -20,10 +19,15 @@ usage() {
     echo 
     echo "    -n   Name of the jvm as seen by jps command (jps needs to run as the same user running the jvm, see -u)"
     echo "    -u   Name of the user running the jvm (tomcat, jboss, ...). You can omit this option if the user running ${0} and the user running the jvm is the same"
+    echo "    -w   Total heap space warning threshold percentage"
+    echo "    -c   Total heap space critical threshold percentage"
+    echo "    -m   metaspace/permgen warning threshold percentage"
+    echo "    -s   metaspace/permgen critical threshold precentage"
+
     exit ${UNKNOWN}
 }
 
-while getopts ":n:u:" o; do
+while getopts ":n:u:w:c:m:s:" o; do
     case "${o}" in
         n)
             name=${OPTARG}
@@ -31,6 +35,18 @@ while getopts ":n:u:" o; do
         u)
             user=${OPTARG}
             ;;
+	w)
+	    heapwarn=${OPTARG}
+	    ;;
+	c)
+	    heapcrit=${OPTARG}
+	    ;;
+	m)
+	    metawarn=${OPTARG}
+	    ;;
+	s)
+	    metacrit=${OPTARG}
+	    ;;
         *)
             usage
             ;;
@@ -44,6 +60,10 @@ fi
 
 echo "name = ${name}"
 echo "user = ${user}"
+echo "heap warn = ${heapwarn}"
+echo "heap crit = ${heapcrit}"
+echo "meta warn = ${metawarn}"
+echo "meta crit = ${metacrit}"
 
 if [ -z ${user} ]
 then
@@ -80,6 +100,7 @@ eval `echo ${jstat} | awk '{ for (i = 1; i <= (NF/2); i++) print $i"="$((NF/2)+i
 
 #echo $S0C $S1C $S0U $S1U $EC $EU $OC $OU $PC $PU $YGC $YGCT $FGC $FGCT $GCT
 
+
 capacity=`echo ${S0C} ${S1C} ${EC} ${OC} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
 usage=`echo ${S0U} ${S1U} ${EU} ${OU} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
 survivor=`echo ${S0U} ${S1U} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
@@ -95,6 +116,10 @@ meta=`echo ${MU} | awk '{ print $1 / 1024}'`
 permcapacity=`echo ${PC} | awk '{ print $1 / 1024}'`
 perm=`echo ${PU} | awk '{ print $1 / 1024}'`
 
+# Work out the thresholds as a percentage of the capacity
+thresholdheapwarn=`echo ${capacity} ${heapwarn} | awk ' { print ($1 / 100) * $2}'`
+thresholdheapcrit=`echo ${capacity} ${heapcrit} | awk ' { print ($1 / 100) * $2}'`
+
 #echo "Minor GC / Time: $YGC / $YGCT"
 #echo "Major GC / Time: $FGC / $FGCT"
 #echo "---"
@@ -104,7 +129,11 @@ perm=`echo ${PU} | awk '{ print $1 / 1024}'`
 # If the PC variable (Permgen capacity) if zero / unset then we will output metaspace, if not we will output permgen
 if [ -z ${PC} ]
 then
-    echo "JVM Usage OK|totalHeap=${usage}MB;;;;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} metaSpace=${meta}MB;;;;${metacapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+    thresholdmetawarn=`echo ${metacapacity} ${metawarn} | awk ' { print ($1 / 100) * $2}'`
+    thresholdmetacrit=`echo ${metacapacity} ${metacrit} | awk ' { print ($1 / 100) * $2}'`
+    echo "JVM Usage OK|totalHeap=${usage}MB;${thresholdheapwarn};${thresholdheapcrit};;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} metaSpace=${meta}MB;${thresholdmetawarn};${thresholdmetacrit};;${metacapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
 else
-    echo "JVM Usage OK|totalHeap=${usage}MB;;;;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} permGen=${perm}MB;;;;${permcapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+    thresholdmetawarn=`echo ${permcapacity} ${metawarn} | awk ' { print ($1 / 100) * $2}'`
+    thresholdmetacrit=`echo ${permcapacity} ${metacrit} | awk ' { print ($1 / 100) * $2}'`
+    echo "JVM Usage OK|totalHeap=${usage}MB;${thresholdheapwarn};${thresholdheapcrit};;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} permGen=${perm}MB;${thresholdmetawarn};${thresholdmetacrit};;${permcapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
 fi
