@@ -19,7 +19,8 @@ usage() {
     echo 
     echo "    -n   Name of the jvm as seen by jps command (jps needs to run as the same user running the jvm, see -u)"
     echo "    -u   Name of the user running the jvm (tomcat, jboss, ...). You can omit this option if the user running ${0} and the user running the jvm is the same"
-    echo "    -w   Total heap space warning threshold percentage"
+    echo "    -h   Optional path of the Java runtime, if your application is using a custom java installation"
+	echo "    -w   Total heap space warning threshold percentage"
     echo "    -c   Total heap space critical threshold percentage"
     echo "    -m   metaspace/permgen warning threshold percentage"
     echo "    -s   metaspace/permgen critical threshold precentage"
@@ -27,14 +28,14 @@ usage() {
     exit ${UNKNOWN}
 }
 
-while getopts ":n:u:w:c:m:s:" o; do
+while getopts ":n:u:w:c:m:s:h:" o; do
     case "${o}" in
-        n)
-            name=${OPTARG}
-            ;;
-        u)
-            user=${OPTARG}
-            ;;
+    n)
+        name=${OPTARG}
+        ;;
+    u)
+        user=${OPTARG}
+        ;;
 	w)
 	    heapwarn=${OPTARG}
 	    ;;
@@ -47,9 +48,12 @@ while getopts ":n:u:w:c:m:s:" o; do
 	s)
 	    metacrit=${OPTARG}
 	    ;;
-        *)
-            usage
-            ;;
+    h)  
+	    javahome=${OPTARG}
+        ;;
+    *)
+        usage
+        ;;
     esac
 done
 
@@ -57,14 +61,10 @@ if [ -z "${name}" ]
 then
     usage
 fi
-
-echo "name = ${name}"
-echo "user = ${user}"
-echo "heap warn = ${heapwarn}"
-echo "heap crit = ${heapcrit}"
-echo "meta warn = ${metawarn}"
-echo "meta crit = ${metacrit}"
-
+if [ -z ${javahome} ]
+then 
+    export   PATH=${javahome}/bin/:$PATH
+fi
 if [ -z ${user} ]
 then
     jps=`jps -v | grep ${name}`
