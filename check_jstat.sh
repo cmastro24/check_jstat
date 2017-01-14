@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Nagios exit codes
+readonly OK=0
+readonly WARN=1
+readonly CRIT=2
+readonly UNKNOWN=3
+
+# TODO: Use heapballoon size as capicity if Xmx is not specified
+# TODO: Comment the code
+# TODO: Support verbosity levels
+# TODO: Change units to correctly identify max size (convert to MB if not)
+# TODO: Support matching pased on PID file instead of jps name
+
+usage() {
+    echo "Usage: ${0} [-n <string>] [-u <string>]"
+    echo 
+    echo "${0} - Monitor a JVM GC activities. This will help you to understand what the JVM is doing and to collect a baseline for GC tuning."
+    echo 
+    echo "    -n   Name of the jvm as seen by jps command (jps needs to run as the same user running the jvm, see -u)"
+    echo "    -u   Name of the user running the jvm (tomcat, jboss, ...). You can omit this option if the user running ${0} and the user running the jvm is the same"
+    echo "    -h   Optional path of the Java runtime, if your application is using a custom java installation"
+	echo "    -w   Total heap space warning threshold percentage"
+    echo "    -c   Total heap space critical threshold percentage"
+    echo "    -m   metaspace/permgen warning threshold percentage"
+    echo "    -s   metaspace/permgen critical threshold precentage"
+
+    exit ${UNKNOWN}
+}
+
+while getopts ":n:u:w:c:m:s:h:" o; do
+    case "${o}" in
+    n)
+        name=${OPTARG}
+        ;;
+    u)
+        user=${OPTARG}
+        ;;
+	w)
+	    heapwarn=${OPTARG}
+	    ;;
+	c)
+	    heapcrit=${OPTARG}
+	    ;;
+	m)
+	    metawarn=${OPTARG}
+	    ;;
+	s)
+	    metacrit=${OPTARG}
+	    ;;
+    h)  
+	    javahome=${OPTARG}
+        ;;
+    *)
+        usage
+        ;;
+    esac
+done
+
+if [ -z "${name}" ] 
+then
+    usage
+fi
+if [ -z ${javahome} ]
+then 
+    export   PATH=${javahome}/bin/:$PATH
+fi
+if [ -z ${user} ]
+then
+    jps=`jps -v | grep ${name}`
+else
+    jps=`sudo -u ${user} jps -v | grep ${name}`
+fi
+
+if [ -z "${jps}" ]
+then
+    echo "Cannot find process ${name}"
+    exit ${CRIT}
+fi
+
+pid=`echo ${jps} | awk '{ print $1}'`
+Xmx=`echo "${jps}" | egrep -o 'Xmx[0-9]*[[:alpha:]]*' | uniq | egrep -o '[0-9]*'`
+XmxUnits=`echo "${jps}" | egrep -o 'Xmx[0-9]*[[:alpha:]]*' | uniq | egrep -o '[[:alpha:]]$'`
+
+#Xms=`echo "$jps" | egrep -o 'Xms[0-9]*[[:alpha:]]*' | uniq`
+
+#echo "pid: $pid"
+#echo "Total heap: $Xmx $XmxUnits"
+
+#echo "Initial heap: $Xms"
+
+if [ -z ${user} ]
+then
+    jstat=`jstat -gc "${pid}"`
+else
+    jstat=`sudo -u ${user} jstat -gc "${pid}"`
+fi
+
+eval `echo ${jstat} | awk '{ for (i = 1; i <= (NF/2); i++) print $i"="$((NF/2)+i) }'`
+
+#echo $S0C $S1C $S0U $S1U $EC $EU $OC $OU $PC $PU $YGC $YGCT $FGC $FGCT $GCT
+
+
+capacity=`echo ${S0C} ${S1C} ${EC} ${OC} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
+usage=`echo ${S0U} ${S1U} ${EU} ${OU} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
+survivor=`echo ${S0U} ${S1U} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
+survivorcapacity=`echo ${S0C} ${S1C} | awk '{sum=0; for (i = 1; i <= NF; i++) { sum += $i } print sum / 1024 }'`
+eden=`echo ${EU} | awk '{ print $1 / 1024}'`
+edencapacity=`echo ${EC} | awk '{ print $1 / 1024}'`
+tenured=`echo ${OU} | awk '{ print $1 / 1024}'`
+tenuredcapacity=`echo ${OC} | awk '{ print $1 / 1024}'`
+
+# Capture permgen and metaspace
+metacapacity=`echo ${MC} | awk '{ print $1 / 1024}'`
+meta=`echo ${MU} | awk '{ print $1 / 1024}'`
+permcapacity=`echo ${PC} | awk '{ print $1 / 1024}'`
+perm=`echo ${PU} | awk '{ print $1 / 1024}'`
+
+# Work out the thresholds as a percentage of the capacity
+thresholdheapwarn=`echo ${capacity} ${heapwarn} | awk ' { print ($1 / 100) * $2}'`
+thresholdheapcrit=`echo ${capacity} ${heapcrit} | awk ' { print ($1 / 100) * $2}'`
+
+#echo "Minor GC / Time: $YGC / $YGCT"
+#echo "Major GC / Time: $FGC / $FGCT"
+#echo "---"
+#echo "Eden / Survivor / Old: $EU ($EC) / $survivor ($survivorcapacity) / $OU ($OC)"
+#echo "Total heap: $usage Mb /$capacity Mb"
+
+# If the PC variable (Permgen capacity) if zero / unset then we will output metaspace, if not we will output permgen
+if [ -z ${PC} ]
+then
+    thresholdmetawarn=`echo ${metacapacity} ${metawarn} | awk ' { print ($1 / 100) * $2}'`
+    thresholdmetacrit=`echo ${metacapacity} ${metacrit} | awk ' { print ($1 / 100) * $2}'`
+    echo "JVM Usage OK|totalHeap=${usage}MB;${thresholdheapwarn};${thresholdheapcrit};;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} metaSpace=${meta}MB;${thresholdmetawarn};${thresholdmetacrit};;${metacapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+else
+    thresholdmetawarn=`echo ${permcapacity} ${metawarn} | awk ' { print ($1 / 100) * $2}'`
+    thresholdmetacrit=`echo ${permcapacity} ${metacrit} | awk ' { print ($1 / 100) * $2}'`
+    echo "JVM Usage OK|totalHeap=${usage}MB;${thresholdheapwarn};${thresholdheapcrit};;${Xmx} heapBalloon=${capacity}MB edenUsage=${eden}MB;;;;${edencapacity} survivorUsage=${survivor}MB;;;;${survivorcapacity} tenuredUsage=${tenured}MB;;;;${tenuredcapacity} permGen=${perm}MB;${thresholdmetawarn};${thresholdmetacrit};;${permcapacity}  minorGCAmount=${YGC} minorGCTime=${YGCT}s majorGCAmount=${FGC} majorGCTime=${FGCT}s"
+fi
